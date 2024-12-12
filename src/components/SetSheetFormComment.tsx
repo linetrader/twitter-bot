@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const spreadsheetID = process.env.NEXT_PUBLIC_GOOGLE_SHEET_COMMENT_ID;
+import { submitToSheets } from "@/lib/fetchSheetsData";
 
 export default function SetSheetFormComment() {
   const [value, setValue] = useState<string>(""); // 단일 입력 필드 값
@@ -10,29 +9,17 @@ export default function SetSheetFormComment() {
   const [error, setError] = useState<string | null>(null); // 에러 메시지
   const [loading, setLoading] = useState<boolean>(false); // 로딩 상태
 
+  const spreadsheetID =
+    process.env.NEXT_PUBLIC_GOOGLE_SHEET_COMMENT_ID || "default-id";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus(null);
     setError(null);
     setLoading(true);
 
-    console.log("Client Spreadsheet ID:", spreadsheetID);
-    console.log("Client Value:", value);
-
     try {
-      const response = await fetch("/api/sheets-data-users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ spreadsheetId: spreadsheetID, values: [value] }),
-      });
-
-      if (!response.ok) {
-        throw new Error("데이터 추가에 실패했습니다.");
-      }
-
-      const result = await response.json();
+      const result = await submitToSheets(spreadsheetID, [value]);
       setStatus(result.message);
       setValue(""); // 입력 필드 초기화
     } catch (err: any) {

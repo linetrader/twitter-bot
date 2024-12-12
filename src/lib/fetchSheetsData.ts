@@ -22,3 +22,26 @@ export async function fetchSheetsData(
 
   return result.data;
 }
+
+export async function submitToSheets(
+  spreadsheetId: string,
+  values: string[]
+): Promise<{ message: string }> {
+  if (!spreadsheetId) {
+    throw new Error("Spreadsheet ID가 설정되지 않았습니다.");
+  }
+
+  const response = await fetch("/api/sheets-data-handler", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ spreadsheetId, values }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Google Sheets API 호출에 실패했습니다.");
+  }
+
+  return response.json();
+}
