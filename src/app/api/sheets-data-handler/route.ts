@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 async function getSheetsClient() {
   const keyFilePath = path.join(
     process.cwd(),
-    process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH || "service-account-key.json"
+    process.env.SERVICE_ACCOUNT_KEY || "service-account-key.json"
   );
 
   const auth = new google.auth.GoogleAuth({
