@@ -1,32 +1,29 @@
 "use client";
 
 import { useState } from "react";
-
-const spreadsheetID = process.env.NEXT_PUBLIC_GOOGLE_SHEET_COMMENT_ID;
+import { fetchSheetsData } from "@/lib/fetchSheetsData";
 
 export default function GetSheetComment() {
-  const [data, setData] = useState<string[][] | null>(null); // Google Sheets 데이터 저장
-  const [loading, setLoading] = useState<boolean>(false); // 로딩 상태
-  const [error, setError] = useState<string | null>(null); // 에러 메시지
+  const [data, setData] = useState<string[][] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchSheetsData = async () => {
+  const spreadsheetID =
+    process.env.NEXT_PUBLIC_GOOGLE_SHEET_COMMENT_ID || "default-id";
+
+  console.log(spreadsheetID);
+
+  const handleFetchData = async () => {
     setLoading(true);
     setError(null);
     setData(null);
 
     try {
-      const response = await fetch(
-        `/api/sheets-data-users?spreadsheetId=${spreadsheetID}`,
-        {
-          method: "GET",
-        }
+      const result = await fetchSheetsData(
+        spreadsheetID,
+        "/api/sheets-data-handler"
       );
-      if (!response.ok) {
-        throw new Error("데이터를 가져오는 데 실패했습니다.");
-      }
-
-      const result = await response.json();
-      setData(result.data);
+      setData(result);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -37,7 +34,7 @@ export default function GetSheetComment() {
   return (
     <div className="p-5 bg-white shadow rounded-md mt-6">
       <button
-        onClick={fetchSheetsData}
+        onClick={handleFetchData}
         className="w-full py-3 text-white font-semibold bg-blue-500 rounded-md shadow-md hover:bg-blue-600 focus:ring-2 focus:ring-blue-300 transition"
       >
         {loading ? "로딩 중..." : "데이터 가져오기"}
