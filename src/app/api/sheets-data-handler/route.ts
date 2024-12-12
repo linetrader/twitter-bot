@@ -1,16 +1,30 @@
 import { google } from "googleapis";
-import path from "path";
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 
 // Google Sheets 클라이언트 생성
 async function getSheetsClient() {
-  const keyFilePath = path.join(
-    process.cwd(),
-    process.env.SERVICE_ACCOUNT_KEY || "service-account-key.json"
-  );
+  let serviceAccountKey: string;
+
+  if (process.env.SERVICE_ACCOUNT_KEY) {
+    // Vercel 환경에서 환경 변수에서 키 읽기
+    console.log("Using SERVICE_ACCOUNT_KEY from environment variables.");
+    serviceAccountKey = process.env.SERVICE_ACCOUNT_KEY;
+  } else {
+    // 로컬 환경에서 service-account-key.json 파일에서 키 읽기
+    console.log("Using service-account-key.json from local filesystem.");
+    const keyFilePath = path.join(process.cwd(), "service-account-key.json");
+    if (!fs.existsSync(keyFilePath)) {
+      throw new Error(
+        `로컬 환경에서 service-account-key.json 파일이 존재하지 않습니다. (${keyFilePath})`
+      );
+    }
+    serviceAccountKey = fs.readFileSync(keyFilePath, "utf8");
+  }
 
   const auth = new google.auth.GoogleAuth({
-    keyFile: keyFilePath,
+    credentials: JSON.parse(serviceAccountKey), // JSON 문자열을 객체로 변환
     scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   });
 
