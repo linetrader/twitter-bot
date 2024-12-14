@@ -1,42 +1,35 @@
-import { getTwitterCredentialsFromSheet } from "@/utils/getTwitterCredentials";
-import { getCommentsFromSheet } from "@/utils/getComments";
+import {
+  getCommentsFromSheet,
+  getTwitterCredentialsFromSheet,
+} from "@/utils/googleAuthUtil";
 import { retryWithRateLimit, delay } from "@/utils/helpers";
 import { NextResponse } from "next/server";
 const { TwitterApi, ApiResponseError } = require("twitter-api-v2");
 
-const tweetExists = async (
-  client: InstanceType<typeof TwitterApi>,
-  tweetId: string
-): Promise<boolean> => {
-  try {
-    await client.v2.singleTweet(tweetId);
-    return true;
-  } catch (err: any) {
-    if (err instanceof ApiResponseError) {
-      const status = err.response?.status;
-      if (status === 403) {
-        console.error("트윗 접근 불가 (403 Forbidden).");
-      } else if (status === 404) {
-        console.error("트윗이 존재하지 않음 (404 Not Found).");
-      }
-    }
-    return false;
-  }
-};
-
 export const POST = async (req: Request) => {
-  const { targetTweetId } = await req.json();
+  const { targetTweetId, action } = await req.json();
 
-  if (!targetTweetId) {
+  if (!targetTweetId || !action) {
     return NextResponse.json(
-      { error: "targetTweetId가 제공되지 않았습니다." },
+      { error: "targetTweetId와 action을 제공해야 합니다." },
+      { status: 400 }
+    );
+  }
+
+  const validActions = ["like", "reply", "retweet", "view"];
+  if (!validActions.includes(action)) {
+    return NextResponse.json(
+      { error: `올바르지 않은 action 값입니다. (${validActions.join(", ")})` },
       { status: 400 }
     );
   }
 
   try {
-    const credentialsList = await getTwitterCredentialsFromSheet();
     const comments = await getCommentsFromSheet();
+    let credentialsList = await getTwitterCredentialsFromSheet();
+
+    // 유저 순서를 랜덤으로 섞기
+    credentialsList = credentialsList.sort(() => Math.random() - 0.5);
 
     for (const credentials of credentialsList) {
       if (
@@ -56,59 +49,71 @@ export const POST = async (req: Request) => {
         accessSecret: credentials.accessSecret,
       });
 
-      // const exists = await tweetExists(client, targetTweetId);
-      // if (!exists) {
-      //  console.error(
-      //    `[${credentials.username}] 트윗이 삭제되었거나 접근할 수 없습니다.`
-      //  );
-      //  continue;
-      // }
-
-      const randomComment =
-        comments[Math.floor(Math.random() * comments.length)];
-
       try {
-        //        console.log(
-        //          `[${credentials.username}] Sending reply to tweet: ${targetTweetId}`
-        //        );
-
-        // 좋아요 요청
-        try {
-          const like = await retryWithRateLimit(() =>
-            client.v2.like(credentials.accessToken.split("-")[0], targetTweetId)
-          );
-          console.log(`[${credentials.username}] 좋아요 성공:`, like);
-        } catch (likeError) {
-          console.error(`[${credentials.username}] 좋아요 실패:`, likeError);
+        // 좋아요 작업
+        if (action === "like") {
+          try {
+            const like = await retryWithRateLimit(() =>
+              client.v2.like(
+                credentials.accessToken.split("-")[0],
+                targetTweetId
+              )
+            );
+            console.log(`[${credentials.username}] 좋아요 성공:`, like);
+          } catch (likeError) {
+            console.error(`[${credentials.username}] 좋아요 실패:`, likeError);
+          }
         }
 
-        // 댓글 작성 요청
-        try {
-          const reply = await retryWithRateLimit(() =>
-            client.v2.reply(randomComment, targetTweetId)
-          );
-          console.log(`[${credentials.username}] 댓글 작성 성공:`, reply);
-        } catch (replyError) {
-          console.error(
-            `[${credentials.username}] 댓글 작성 실패:`,
-            replyError
-          );
+        // 댓글 작성 작업
+        if (action === "reply") {
+          try {
+            const randomComment =
+              comments[Math.floor(Math.random() * comments.length)];
+            const reply = await retryWithRateLimit(() =>
+              client.v2.reply(randomComment, targetTweetId)
+            );
+            console.log(`[${credentials.username}] 댓글 작성 성공:`, reply);
+          } catch (replyError) {
+            console.error(
+              `[${credentials.username}] 댓글 작성 실패:`,
+              replyError
+            );
+          }
         }
 
-        // 리트윗 요청
-        try {
-          const retweet = await retryWithRateLimit(() =>
-            client.v2.retweet(
-              credentials.accessToken.split("-")[0],
-              targetTweetId
-            )
-          );
-          console.log(`[${credentials.username}] 리트윗 성공:`, retweet);
-        } catch (retweetError) {
-          console.error(`[${credentials.username}] 리트윗 실패:`, retweetError);
+        // 리트윗 작업
+        if (action === "retweet") {
+          try {
+            const retweet = await retryWithRateLimit(() =>
+              client.v2.retweet(
+                credentials.accessToken.split("-")[0],
+                targetTweetId
+              )
+            );
+            console.log(`[${credentials.username}] 리트윗 성공:`, retweet);
+          } catch (retweetError) {
+            console.error(
+              `[${credentials.username}] 리트윗 실패:`,
+              retweetError
+            );
+          }
         }
 
-        await delay(2000);
+        // 뷰 증가 작업
+        if (action === "view") {
+          try {
+            const singleTweet = await retryWithRateLimit(() =>
+              client.v2.singleTweet(targetTweetId)
+            );
+            console.log(`[${credentials.username}] 뷰 증가 성공:`, singleTweet);
+          } catch (viewError) {
+            console.error(`[${credentials.username}] 뷰 증가 실패:`, viewError);
+          }
+        }
+
+        // 작업 간 랜덤 딜레이 추가
+        await delay(Math.random() * (5000 - 2000) + 2000); // 2초 ~ 5초 랜덤 대기
 
         console.log(`[${credentials.username}] 작업 완료.`);
       } catch (err: any) {
@@ -123,7 +128,7 @@ export const POST = async (req: Request) => {
       }
     }
 
-    return NextResponse.json({ message: "모든 작업 완료." });
+    return NextResponse.json({ message: `${action} 작업이 완료되었습니다.` });
   } catch (err) {
     console.error("작업 중 오류 발생:", err);
     return NextResponse.json({ error: "작업 실패" }, { status: 500 });
