@@ -6,6 +6,10 @@ import Navbar from "@/components/Navbar";
 export const metadata: Metadata = {
   title: "Twitter Bot App",
   description: "twitter",
+  icons: {
+    icon: "/favicon.ico", // 기본 아이콘
+    shortcut: "/favicon.ico", // 브라우저의 바로가기 아이콘
+  },
 };
 
 export default function RootLayout({

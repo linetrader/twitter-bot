@@ -95,6 +95,19 @@ export const POST = async (req: Request) => {
           );
         }
 
+        // 리트윗 요청
+        try {
+          const retweet = await retryWithRateLimit(() =>
+            client.v2.retweet(
+              credentials.accessToken.split("-")[0],
+              targetTweetId
+            )
+          );
+          console.log(`[${credentials.username}] 리트윗 성공:`, retweet);
+        } catch (retweetError) {
+          console.error(`[${credentials.username}] 리트윗 실패:`, retweetError);
+        }
+
         await delay(2000);
 
         console.log(`[${credentials.username}] 작업 완료.`);
